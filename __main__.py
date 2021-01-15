@@ -36,7 +36,7 @@ else:
 setup_args = {
     # distribution name
     "name": settings.DISTRIBUTION_NAME,
-    "version": "0.0.1",
+    "version": settings.DISTRIBUTION_VER,
 
     "ext_package": settings.TOP_PACKAGE_NAME,
     "ext_modules": ext_c

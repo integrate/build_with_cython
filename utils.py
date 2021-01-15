@@ -122,11 +122,12 @@ def clean_temp_build_files(**kwargs):
 def build_ext(result_path, **kwargs):
     try:
         # prepare params
-        build_lib_param = '--build-lib=' + result_path
+        result_path_param = '--dist-dir=' + result_path
+        temp_path_param = "--dist-dir=build"
 
         include_dirs = ";".join([sys.prefix, sys.exec_prefix])
 
-        setuptools.setup(script_args=["build_ext", build_lib_param], **kwargs)
+        setuptools.setup(script_args=["bdist_wheel", result_path_param, temp_path_param], **kwargs)
     except:
         return False
 
