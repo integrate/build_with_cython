@@ -8,6 +8,8 @@ BUILD_TEMP = "cbuild_temp"
 
 
 class CBuild(_base_command):
+    description = 'convert all ext_modules to c and makes wheel with binary extension'
+
     def remove_python_files(self, list):
         for f in list:
             try:
