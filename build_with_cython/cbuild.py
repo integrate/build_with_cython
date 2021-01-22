@@ -2,7 +2,10 @@ from wheel.bdist_wheel import bdist_wheel as _base_command
 
 from Cython.Build import cythonize
 
-import os, shutil
+import sys, os, shutil
+
+from modulegraph import find_modules
+from build_with_cython import dep_an
 
 BUILD_TEMP = "cbuild_temp"
 
@@ -115,27 +118,41 @@ class CBuild(_base_command):
 
         return res
 
-    def generate_module_loading_code(self, module_name):
-        return """
+    def generate_module_loading_code(self, module_name, package_name=None, do_c_import=True):
+        full_module_name = module_name if package_name is None else package_name + "_" + module_name
+
+        if do_c_import:
+            res = """
 cdef extern from *:
     \"\"\"
     PyObject *PyInit_""" + module_name + """(void);
     \"\"\"
-    object PyInit_""" + module_name + """()
+    object PyInit_""" + module_name + """()"""
+        else:
+            res = ""
 
-PyImport_AppendInittab(\"""" + module_name + """\", PyInit_""" + module_name + """)
-sys.builtin_module_names = list(sys.builtin_module_names)+[\"""" + module_name + """\"]
+        res = res + """
+PyImport_AppendInittab(\"""" + full_module_name + """\", PyInit_""" + module_name + """)
+sys.builtin_module_names = list(sys.builtin_module_names)+[\"""" + full_module_name + """\"]
 """
+#             res = res + """
+# PyImport_AppendInittab(\"""" + module_name + """\", PyInit_""" + module_name + """)
+# """
 
-    def generate_modules_loading_code(self, module_names):
+        return res
+
+
+    def generate_modules_loading_code(self, module_names, package_name=None):
         res = """
 ###### AUTO GENERATED CODE ### BEGIN ######
 import sys
 cdef extern from "Python.h":
     int PyImport_AppendInittab(const char *name, object (*initfunc)())
 """
+        # res += self.generate_module_loading_code(package_name)
+
         for m in module_names:
-            res += self.generate_module_loading_code(m)
+            res += self.generate_module_loading_code(m, package_name)
 
         res += """
 ###### AUTO GENERATED CODE ### END ######
@@ -144,11 +161,11 @@ cdef extern from "Python.h":
 
         return res
 
-    def patch_pyx_file_to_load_modules(self, pyx_file, module_names):
+    def patch_pyx_file_to_load_modules(self, pyx_file, module_names, package_name=None):
         if "__init__" in module_names:
             module_names.remove("__init__")
 
-        add_str = self.generate_modules_loading_code(module_names)
+        add_str = self.generate_modules_loading_code(module_names, package_name)
 
         with open(pyx_file, 'r+') as f:
             content = f.read()
@@ -162,16 +179,19 @@ cdef extern from "Python.h":
 
         # copy to temp folder
         for ext in self.distribution.ext_modules:
+            # get module graph
+            orig_package_source = os.path.split(ext.sources[0])[0]
+            graph = dep_an.get_dep_list(orig_package_source)
+
             new_sources = self.copy_to_temp_folder(ext.sources)
             ext.sources = new_sources
 
-            #prepare __init__
-            package_source =  os.path.split(ext.sources[0])[0]
-                # make sure there is __init__.pyx in the root of package
+            # prepare __init__
+            package_source = os.path.split(ext.sources[0])[0]
+            # make sure there is __init__.pyx in the root of package
             init_pyx_path = self.prepare_init_py_file(package_source, ext.sources)
             module_names = self.get_files_from_folder_by_ext(package_source, [".py", ".pyx"], False, True, False)
-            self.patch_pyx_file_to_load_modules(init_pyx_path, module_names)
-
+            self.patch_pyx_file_to_load_modules(init_pyx_path, module_names, ext.name)
 
         # generate c files
         orig_modules = self.distribution.ext_modules
@@ -185,6 +205,6 @@ cdef extern from "Python.h":
         res = super().run()
 
         # remove temp folder
-        self.remove_folder(BUILD_TEMP)
+        # self.remove_folder(BUILD_TEMP)
 
         return res
