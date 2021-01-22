@@ -4,7 +4,6 @@ from Cython.Build import cythonize
 
 import sys, os, shutil
 
-from modulegraph import find_modules
 from build_with_cython import dep_an
 
 BUILD_TEMP = "cbuild_temp"
@@ -134,6 +133,7 @@ cdef extern from *:
         res = res + """
 PyImport_AppendInittab(\"""" + full_module_name + """\", PyInit_""" + module_name + """)
 sys.builtin_module_names = list(sys.builtin_module_names)+[\"""" + full_module_name + """\"]
+
 """
 #             res = res + """
 # PyImport_AppendInittab(\"""" + module_name + """\", PyInit_""" + module_name + """)
@@ -145,7 +145,7 @@ sys.builtin_module_names = list(sys.builtin_module_names)+[\"""" + full_module_n
     def generate_modules_loading_code(self, module_names, package_name=None):
         res = """
 ###### AUTO GENERATED CODE ### BEGIN ######
-import sys
+import sys, importlib
 cdef extern from "Python.h":
     int PyImport_AppendInittab(const char *name, object (*initfunc)())
 """
@@ -153,6 +153,10 @@ cdef extern from "Python.h":
 
         for m in module_names:
             res += self.generate_module_loading_code(m, package_name)
+
+        for m in module_names:
+            res +=m+"=importlib.import_module(\""+package_name+"_"+m+"""\")
+"""
 
         res += """
 ###### AUTO GENERATED CODE ### END ######
@@ -179,9 +183,9 @@ cdef extern from "Python.h":
 
         # copy to temp folder
         for ext in self.distribution.ext_modules:
-            # get module graph
+            # get module list with respect to import order
             orig_package_source = os.path.split(ext.sources[0])[0]
-            graph = dep_an.get_dep_list(orig_package_source)
+            module_names = dep_an.get_dep_list(orig_package_source)
 
             new_sources = self.copy_to_temp_folder(ext.sources)
             ext.sources = new_sources
@@ -190,7 +194,6 @@ cdef extern from "Python.h":
             package_source = os.path.split(ext.sources[0])[0]
             # make sure there is __init__.pyx in the root of package
             init_pyx_path = self.prepare_init_py_file(package_source, ext.sources)
-            module_names = self.get_files_from_folder_by_ext(package_source, [".py", ".pyx"], False, True, False)
             self.patch_pyx_file_to_load_modules(init_pyx_path, module_names, ext.name)
 
         # generate c files
