@@ -89,7 +89,7 @@ def _add_mod_dep_tree(modgraph, package_source, mod_name, dep_tree):
         _add_mod_dep_tree(modgraph, package_source, depmod, dep_tree)
 
 
-def get_dep_list(package_source):
+def get_dep_list(package_source, full_module_list):
     package_source = os.path.abspath(package_source)
 
     # no init py - no modules will be accessible
@@ -105,7 +105,7 @@ def get_dep_list(package_source):
     root_refs = modgraph.getReferences(package_name)
 
     # get tree
-    all_modules = _get_deps_list(root_refs, package_source, [])
+    all_modules = full_module_list.copy()#_get_deps_list(root_refs, package_source, [])
     deps_struct = []  # {name:"", deps=[]}
     for mod in all_modules:
         _add_mod_dep_tree(modgraph, package_source, mod, deps_struct)

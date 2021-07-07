@@ -67,7 +67,7 @@ class CBuild(_base_command):
 
         return new_sources
 
-    def prepare_init_py_file(self, package_source_path, sources_list):
+    def prepare_init_pyx_file(self, package_source_path, sources_list):
         init_py_path = os.path.join(package_source_path, "__init__.py")
         init_pyx_path = os.path.join(package_source_path, "__init__.pyx")
 
@@ -185,7 +185,12 @@ cdef extern from "Python.h":
         for ext in self.distribution.ext_modules:
             # get module list with respect to import order
             orig_package_source = os.path.split(ext.sources[0])[0]
-            module_names = dep_an.get_dep_list(orig_package_source)
+                #get full list of modules
+                #otherwise some modules will stay inaccessible for package mode
+            all_modules_not_sorted = self.get_files_from_folder_by_ext(orig_package_source, [".py"], False, True, False)
+            if "__init__" in all_modules_not_sorted:
+                all_modules_not_sorted.remove("__init__")
+            module_names = dep_an.get_dep_list(orig_package_source, all_modules_not_sorted)
 
             new_sources = self.copy_to_temp_folder(ext.sources)
             ext.sources = new_sources
@@ -193,7 +198,7 @@ cdef extern from "Python.h":
             # prepare __init__
             package_source = os.path.split(ext.sources[0])[0]
             # make sure there is __init__.pyx in the root of package
-            init_pyx_path = self.prepare_init_py_file(package_source, ext.sources)
+            init_pyx_path = self.prepare_init_pyx_file(package_source, ext.sources)
             self.patch_pyx_file_to_load_modules(init_pyx_path, module_names, ext.name)
 
         # generate c files

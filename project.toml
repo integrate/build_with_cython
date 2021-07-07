@@ -1,7 +1,0 @@
-[build-system]
-requires = [ #какие пакеты должны быть установлены, чтоб процесс мог работать
-    "setuptools >= 51.1.1",
-    "wheel >= 0.36.2"
-]
-
-build-backend = "setuptools.build_meta" #пакет, непосредственно выполняющий сборку
